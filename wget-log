@@ -1,0 +1,11 @@
+--2025-12-13 01:06:43--  https://raw.githubusercontent.com/graphql-compose/graphql-compose-examples/master/examples/northwind/data/csv/orders.csv
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.111.133, 185.199.109.133, 185.199.110.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.111.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 132357 (129K) [text/plain]
+Saving to: ‘data/raw/orders.csv’
+
+       data/r   0%       0  --.-KB/s                  data/raw/orde 100% 129.25K  --.-KB/s    in 0.05s      
+
+2025-12-13 01:06:43 (2.45 MB/s) - ‘data/raw/orders.csv’ saved [132357/132357]
+

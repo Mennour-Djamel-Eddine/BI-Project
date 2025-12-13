@@ -11,6 +11,31 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize column names from camelCase (CSV) to PascalCase (Script expectation)."""
+    mapper = {
+        'orderID': 'OrderID',
+        'customerID': 'CustomerID',
+        'employeeID': 'EmployeeID',
+        'productID': 'ProductID',
+        'categoryID': 'CategoryID',
+        'orderDate': 'OrderDate',
+        'shippedDate': 'ShippedDate',
+        'unitsInStock': 'UnitsInStock',
+        'unitPrice': 'UnitPrice',
+        'quantity': 'Quantity',
+        'discount': 'Discount',
+        'companyName': 'CompanyName',
+        'categoryName': 'CategoryName',
+        'productName': 'ProductName',
+        'supplierID': 'SupplierID',
+        'contactName': 'ContactName',
+        'contactTitle': 'ContactTitle',
+        'shipCountry': 'ShipCountry',
+        # Add others as needed
+    }
+    # Only rename if column exists
+    return df.rename(columns=mapper)
 
 def clean_orders(df_orders: pd.DataFrame) -> pd.DataFrame:
     # Copy to avoid side-effects
@@ -18,6 +43,9 @@ def clean_orders(df_orders: pd.DataFrame) -> pd.DataFrame:
 
     # Normalize column names
     df.columns = [c.strip() for c in df.columns]
+    
+    # Fix casing if needed
+    df = normalize_cols(df)
 
     # Convert dates
     for col in [c for c in df.columns if 'date' in c.lower()]:
@@ -36,6 +64,7 @@ def clean_orders(df_orders: pd.DataFrame) -> pd.DataFrame:
 def clean_order_details(df_od: pd.DataFrame) -> pd.DataFrame:
     df = df_od.copy()
     df.columns = [c.strip() for c in df.columns]
+    df = normalize_cols(df)
 
     # Ensure numeric types
     for col in ['UnitPrice', 'Quantity', 'Discount']:
@@ -57,6 +86,12 @@ def build_sales_table(tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     customers = tables.get('Customers')
     employees = tables.get('Employees')
     categories = tables.get('Categories', None)
+
+    # Normalize optional tables too
+    if products is not None: products = normalize_cols(products)
+    if customers is not None: customers = normalize_cols(customers)
+    if employees is not None: employees = normalize_cols(employees)
+    if categories is not None: categories = normalize_cols(categories)
 
     if orders is None or od is None:
         raise ValueError('Orders and OrderDetails are required')
@@ -82,7 +117,17 @@ def build_sales_table(tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     # Compute TotalPrice
     if 'UnitPrice' in sales.columns and 'Quantity' in sales.columns:
-        sales['TotalPrice'] = pd.to_numeric(sales['UnitPrice'], errors='coerce') * pd.to_numeric(sales['Quantity'], errors='coerce')
+        # Note: if Discount exists, maybe use it? Northwind discount is usually 0.0 to 1.0 (percent)
+        # Net = UnitPrice * Quantity * (1 - Discount)
+        
+        up = pd.to_numeric(sales['UnitPrice'], errors='coerce')
+        qty = pd.to_numeric(sales['Quantity'], errors='coerce')
+        
+        if 'Discount' in sales.columns:
+            disc = pd.to_numeric(sales['Discount'], errors='coerce').fillna(0)
+            sales['TotalPrice'] = up * qty * (1 - disc)
+        else:
+            sales['TotalPrice'] = up * qty
     else:
         sales['TotalPrice'] = np.nan
 
@@ -99,7 +144,8 @@ def build_sales_table(tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         sales['Month'] = sales[date_col].dt.month
 
     # Select a sensible subset of columns for the clean dataset
-    keep_cols = [c for c in ['OrderID','ProductID','ProductName','CategoryID','CategoryName','CustomerID','CompanyName','EmployeeID','OrderDate','ShippedDate','UnitPrice','Quantity','Discount','TotalPrice','Year','Month'] if c in sales.columns]
+    # Added ShipCountry
+    keep_cols = [c for c in ['OrderID','ProductID','ProductName','CategoryID','CategoryName','CustomerID','CompanyName','EmployeeID','OrderDate','ShippedDate','UnitPrice','Quantity','Discount','TotalPrice','Year','Month','ShipCountry'] if c in sales.columns]
     sales_clean = sales[keep_cols].copy()
 
     # Final cleaning: drop duplicates, drop rows without TotalPrice
